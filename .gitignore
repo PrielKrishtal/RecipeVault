@@ -1,0 +1,28 @@
+# Environment variables
+.env
+.env.*
+
+# Virtual Environment
+venv/
+.venv/
+
+# Python cache files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# IDE / Editor specific files
+.vscode/
+.idea/
+
+# OS-generated files
+.DS_Store
+Thumbs.db
+
+# Alembic temp file
+.alembic_stamp
+
+# Test artifacts
+.pytest_cache/
+htmlcov/

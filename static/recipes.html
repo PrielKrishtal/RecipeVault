@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RecipeVault - My Recipes</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Merriweather:wght@700&family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="recipes-page-body">
+    <nav>
+        <div class="container nav-container">
+            <a href="#" class="nav-title">RecipeVault</a>
+            <div class="nav-actions">
+                <div class="user-dropdown">
+                    <span class="user-avatar" id="user-avatar" onclick="toggleDropdown()">Un</span>
+                    <div class="dropdown-content" id="dropdown-menu">
+                        <a href="#" onclick="goToProfile()">👤 Profile</a>
+                        <a href="recipes.html">🍳 My Recipes</a>
+                        <a href="#" onclick="handleLogout()">🚪 Logout</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main>
+        <div class="container">
+            <div class="search-bar">
+                <input type="search" id="search-input" placeholder="Search your recipes..." onkeyup="handleSearch()">
+                <button type="button" aria-label="Search" onclick="performSearch()">🔍</button>
+            </div>
+            <div id="recipes-grid">
+            </div>
+        </div>
+    </main>
+ 
+    <a href="add.html" id="add-recipe-fab" title="Add New Recipe">+</a>
+
+    <footer>
+        <div class="container">
+            <small>
+                RecipeVault - A project by Priel Krishtal. 
+                <a href="https://www.linkedin.com/in/prielkrishtal/"">Linkdin</a> | 
+                <a href="https://github.com/PrielKrishtal/fastapi-recipe-api" target="_blank" rel="noopener">GitHub</a>
+            </small>
+        </div>
+    </footer>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const grid = document.getElementById('recipes-grid');
+        const userAvatar = document.getElementById('user-avatar');
+        const searchInput = document.getElementById('search-input');
+
+        async function updateUserAvatar() {
+            try {
+                const token = localStorage.getItem('accessToken');
+                if (!token) return;
+
+                const response = await fetch('/auth/users/me', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (response.ok) {
+                    const user = await response.json();
+                    const initials = user.email.substring(0, 2).toUpperCase();
+                    userAvatar.textContent = initials;
+                }
+            } catch (error) {
+                console.error('Error fetching user info:', error);
+            }
+        }
+
+        function renderEmptyState(message = "No recipes yet!", subMessage = "Start building your recipe collection by adding your first recipe.") {
+            grid.innerHTML = `
+                <div style="
+                    grid-column: 1 / -1; 
+                    text-align: center; 
+                    padding: 3rem 1rem;
+                    color: var(--subtle-text-color);
+                ">
+                    <div style="font-size: 3rem; margin-bottom: 1rem;">🍳</div>
+                    <h3 style="margin: 0 0 0.5rem 0; color: var(--text-color);">${message}</h3>
+                    <p style="margin: 0; font-size: 1.1rem;">${subMessage}</p>
+                </div>
+            `;
+        }
+
+        // Updated renderRecipes function with delete button
+        function renderRecipes(recipes) {
+            grid.innerHTML = '';
+            
+            if (!recipes || recipes.length === 0) {
+                const isSearching = searchInput.value.trim() !== '';
+                if (isSearching) {
+                    renderEmptyState("No recipes found!", "Try searching with different keywords.");
+                } else {
+                    renderEmptyState();
+                }
+                return;
+            }
+
+            recipes.forEach(recipe => {
+                const card = document.createElement('a');
+                card.className = 'recipe-card';
+                card.href = `view_recipe.html?id=${recipe.id}`;
+                card.innerHTML = `
+                    <div class="card-image">
+                        <img src="${recipe.image || 'https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=500'}" alt="${recipe.title}" loading="lazy">
+                    </div>
+                    <div class="card-content">
+                        <h3>${recipe.title}</h3>
+                        <p>Cook Time: ${recipe.cook_time_minutes} min</p>
+                    </div>
+                    <button class="recipe-delete-btn" onclick="deleteRecipe(event, ${recipe.id}, '${recipe.title.replace(/'/g, "\\'")}')" title="Delete Recipe">
+                        🗑️
+                    </button>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        // New delete recipe function
+        async function deleteRecipe(event, recipeId, recipeTitle) {
+            // Prevent card navigation when clicking delete button
+            event.preventDefault();
+            event.stopPropagation();
+
+            if (!confirm(`Are you sure you want to delete "${recipeTitle}"? This action cannot be undone.`)) {
+                return;
+            }
+
+            try {
+                const token = localStorage.getItem('accessToken');
+                if (!token) {
+                    window.location.href = 'login.html';
+                    return;
+                }
+
+                const response = await fetch(`/recipes/${recipeId}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (response.status === 401) {
+                    localStorage.removeItem('accessToken');
+                    window.location.href = 'login.html';
+                    return;
+                }
+
+                if (response.ok || response.status === 204) {
+                    // Show success message briefly
+                    const button = event.target;
+                    button.textContent = '✓';
+                    button.style.background = 'rgba(40, 167, 69, 0.9)';
+                    
+                    // Refresh the recipes list after a short delay
+                    setTimeout(() => {
+                        const currentQuery = searchInput.value.trim();
+                        if (currentQuery) {
+                            searchRecipes(currentQuery);
+                        } else {
+                            fetchUserRecipes();
+                        }
+                    }, 500);
+                } else {
+                    throw new Error('Failed to delete recipe');
+                }
+            } catch (error) {
+                console.error('Error deleting recipe:', error);
+                alert('Error deleting recipe. Please try again.');
+            }
+        }
+
+        async function fetchUserRecipes() {
+            try {
+                const token = localStorage.getItem('accessToken');
+                if (!token) {
+                    window.location.href = 'login.html';
+                    return;
+                }
+
+                const response = await fetch('/recipes/', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (response.status === 401) {
+                    localStorage.removeItem('accessToken');
+                    window.location.href = 'login.html';
+                    return;
+                }
+
+                if (!response.ok) {
+                    throw new Error('Failed to fetch recipes');
+                }
+
+                const recipes = await response.json();
+                renderRecipes(recipes);
+            } catch (error) {
+                console.error('Error fetching recipes:', error);
+                grid.innerHTML = `
+                    <div style="
+                        grid-column: 1 / -1; 
+                        text-align: center; 
+                        padding: 2rem;
+                        color: #dc3545;
+                    ">
+                        <p>Error loading recipes. Please try again later.</p>
+                    </div>
+                `;
+            }
+        }
+
+        async function searchRecipes(query) {
+            if (!query.trim()) {
+                fetchUserRecipes();
+                return;
+            }
+
+            try {
+                const token = localStorage.getItem('accessToken');
+                if (!token) {
+                    window.location.href = 'login.html';
+                    return;
+                }
+
+                const response = await fetch(`/recipes/search?q=${encodeURIComponent(query)}`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (response.status === 401) {
+                    localStorage.removeItem('accessToken');
+                    window.location.href = 'login.html';
+                    return;
+                }
+
+                if (!response.ok) {
+                    throw new Error('Failed to search recipes');
+                }
+
+                const recipes = await response.json();
+                renderRecipes(recipes);
+            } catch (error) {
+                console.error('Error searching recipes:', error);
+                grid.innerHTML = `
+                    <div style="
+                        grid-column: 1 / -1; 
+                        text-align: center; 
+                        padding: 2rem;
+                        color: #dc3545;
+                    ">
+                        <p>Error searching recipes. Please try again later.</p>
+                    </div>
+                `;
+            }
+        }
+
+        window.toggleDropdown = function() {
+            const dropdown = document.getElementById('dropdown-menu');
+            dropdown.classList.toggle('show');
+        };
+
+        window.handleLogout = function() {
+            if (confirm('Are you sure you want to logout?')) {
+                localStorage.removeItem('accessToken');
+                window.location.href = 'login.html';
+            }
+        };
+
+        window.goToProfile = function() {
+            alert('Profile page coming soon!');
+        };
+
+        window.handleSearch = function() {
+            const query = searchInput.value.trim();
+            clearTimeout(window.searchTimeout);
+            window.searchTimeout = setTimeout(() => {
+                searchRecipes(query);
+            }, 300);
+        };
+
+        window.performSearch = function() {
+            const query = searchInput.value.trim();
+            searchRecipes(query);
+        };
+
+        // Make deleteRecipe available globally
+        window.deleteRecipe = deleteRecipe;
+
+        // Add input event listener for handling backspace, delete, and clear
+        searchInput.addEventListener('input', function(event) {
+            const query = event.target.value.trim();
+            clearTimeout(window.searchTimeout);
+            window.searchTimeout = setTimeout(() => {
+                searchRecipes(query);
+            }, 300);
+        });
+
+        window.addEventListener('click', function(event) {
+            if (!event.target.matches('.user-avatar')) {
+                const dropdown = document.getElementById('dropdown-menu');
+                if (dropdown.classList.contains('show')) {
+                    dropdown.classList.remove('show');
+                }
+            }
+        });
+
+        updateUserAvatar();
+        fetchUserRecipes();
+        window.refreshRecipes = fetchUserRecipes;
+    });
+</script>
+</body>
+</html>

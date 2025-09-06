@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Add Recipe | RecipeVault</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&family=Merriweather:wght@700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="add-recipe-page-body">
+    <!-- Navigation Bar -->
+    <nav class="navbar">
+        <div class="container">
+            <div class="navbar-logo">
+                <span class="food-icon">🥄</span>
+                <span class="app-title">RecipeVault</span>
+            </div>
+            <div class="nav-actions">
+                
+            </div>
+        </div>
+    </nav>
+   
+    <!-- Main Content -->
+    <main>
+        <div class="container">
+            <div class="form-card">
+                <h2>Add New Recipe</h2>
+                <form id="add-recipe-form">
+                    <div class="form-group">
+                        <label for="title">Recipe Title <span class="required">*</span></label>
+                        <input type="text" id="title" name="title" placeholder="Enter recipe title" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="instructions">Cooking Instructions</label>
+                        <div class="instructions-container" id="instructions-container">
+                            <div class="instruction-item">
+                                <div class="instruction-number">1</div>
+                                <textarea class="instruction-input" placeholder="Enter cooking step..." rows="2"></textarea>
+                                <button type="button" class="remove-instruction" onclick="removeInstruction(this)" title="Remove step">×</button>
+                            </div>
+                        </div>
+                        <button type="button" class="add-instruction-btn" onclick="addInstruction()">+ Add Step</button>
+                    </div>
+                                        
+                    <div class="form-group">
+                        <label for="cook_time_minutes">Cook Time (minutes)</label>
+                        <input type="number" id="cook_time_minutes" name="cook_time_minutes" placeholder="30" min="1">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Ingredients</label>
+                        <div id="ingredients-container">
+                            <div class="ingredient-row">
+                                <input type="text" placeholder="Ingredient name" class="ingredient-name" required>
+                                <input type="text" placeholder="Amount" class="ingredient-amount" required>
+                                <button type="button" class="remove-ingredient-btn" onclick="removeIngredient(this)">Remove</button>
+                            </div>
+                        </div>
+                        <button type="button" id="add-ingredient-btn" onclick="addIngredient()">+ Add Another Ingredient</button>
+                    </div>
+                    
+                    <div class="form-actions">
+                        <button type="button" class="btn-secondary" onclick="cancelForm()">Cancel</button>
+                        <button type="submit" class="btn-primary">Save Recipe</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </main>
+
+    <script>
+    // Check authentication
+    if (!localStorage.getItem('accessToken')) {
+        window.location.href = 'login.html';
+    }
+
+    let instructionCount = 1;
+
+    function addIngredient() {
+        const container = document.getElementById('ingredients-container');
+        const ingredientRow = document.createElement('div');
+        ingredientRow.className = 'ingredient-row';
+        ingredientRow.innerHTML = `
+            <input type="text" placeholder="Ingredient name" class="ingredient-name" required>
+            <input type="text" placeholder="Amount" class="ingredient-amount" required>
+            <button type="button" class="remove-ingredient-btn" onclick="removeIngredient(this)">Remove</button>
+        `;
+        container.appendChild(ingredientRow);
+    }
+
+    function removeIngredient(button) {
+        const container = document.getElementById('ingredients-container');
+        if (container.children.length > 1) {
+            button.parentElement.remove();
+        }
+    }
+
+    function addInstruction() {
+        instructionCount++;
+        const container = document.getElementById('instructions-container');
+        
+        const instructionItem = document.createElement('div');
+        instructionItem.className = 'instruction-item';
+        instructionItem.innerHTML = `
+            <div class="instruction-number">${instructionCount}</div>
+            <textarea class="instruction-input" placeholder="Enter cooking step..." rows="2"></textarea>
+            <button type="button" class="remove-instruction" onclick="removeInstruction(this)" title="Remove step">×</button>
+        `;
+        
+        container.appendChild(instructionItem);
+    }
+
+    function removeInstruction(button) {
+        const container = document.getElementById('instructions-container');
+        const items = container.querySelectorAll('.instruction-item');
+        
+        if (items.length > 1) {
+            button.parentElement.remove();
+            updateInstructionNumbers();
+        } else {
+            alert('You must have at least one instruction step.');
+        }
+    }
+
+    function updateInstructionNumbers() {
+        const items = document.querySelectorAll('.instruction-item');
+        items.forEach((item, index) => {
+            const numberElement = item.querySelector('.instruction-number');
+            numberElement.textContent = index + 1;
+        });
+        instructionCount = items.length;
+    }
+
+    function collectInstructions() {
+        const instructionInputs = document.querySelectorAll('.instruction-input');
+        const instructions = [];
+        
+        instructionInputs.forEach((input, index) => {
+            const text = input.value.trim();
+            if (text) {
+                instructions.push(`${index + 1}. ${text}`);
+            }
+        });
+        
+        return instructions.join('\n\n');
+    }
+
+    function cancelForm() {
+        if (confirm('Are you sure you want to cancel? All changes will be lost.')) {
+            window.location.href = 'recipes.html';
+        }
+    }
+
+    function handleLogout() {
+        if (confirm('Are you sure you want to logout?')) {
+            localStorage.removeItem('accessToken');
+            window.location.href = 'login.html';
+        }
+    }
+
+    // Handle form submission - NO IMAGE HANDLING
+    document.getElementById('add-recipe-form').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const submitButton = this.querySelector('button[type="submit"]');
+        const originalText = submitButton.textContent;
+        
+        // Show loading state
+        submitButton.textContent = 'Creating Recipe...';
+        submitButton.disabled = true;
+        
+        // Collect ingredients
+        const ingredients = [];
+        const ingredientRows = document.querySelectorAll('.ingredient-row');
+        ingredientRows.forEach(row => {
+            const name = row.querySelector('.ingredient-name').value.trim();
+            const amount_text = row.querySelector('.ingredient-amount').value.trim();
+            if (name && amount_text) {
+                ingredients.push({ name, amount_text });
+            }
+        });
+
+        // Prepare recipe data - NO IMAGE
+        const recipeData = {
+            title: document.getElementById('title').value.trim(),
+            description: collectInstructions(),
+            cook_time_minutes: parseInt(document.getElementById('cook_time_minutes').value) || 0,
+            image: null, // No image handling
+            ingredients: ingredients
+        };
+
+        try {
+            const token = localStorage.getItem('accessToken');
+            if (!token) {
+                window.location.href = 'login.html';
+                return;
+            }
+
+            const response = await fetch('/recipes/', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(recipeData)
+            });
+
+            if (response.status === 401) {
+                localStorage.removeItem('accessToken');
+                window.location.href = 'login.html';
+                return;
+            }
+
+            if (response.ok) {
+                const newRecipe = await response.json();
+                
+                // Show success state
+                submitButton.textContent = '✅ Recipe Created!';
+                submitButton.style.backgroundColor = '#28a745';
+                
+                // Wait a moment, then redirect to recipes page
+                setTimeout(() => {
+                    window.location.href = 'recipes.html';
+                }, 1500);
+                
+            } else {
+                const errorData = await response.json();
+                throw new Error(errorData.detail || 'Failed to create recipe');
+            }
+        } catch (error) {
+            console.error('Error creating recipe:', error);
+            
+            // Reset button on error
+            submitButton.textContent = originalText;
+            submitButton.disabled = false;
+            
+            alert('Error creating recipe: ' + error.message);
+        }
+    });
+</script>
+</body>
+</html>

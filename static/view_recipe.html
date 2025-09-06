@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Recipe Details | RecipeVault</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&family=Merriweather:wght@700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="view-recipe-page-body">
+    <!-- Navigation Bar - UPDATED TO MATCH RECIPES.HTML -->
+    <nav>
+        <div class="container nav-container">
+            <a href="recipes.html" class="nav-title">🥄 RecipeVault</a>
+            <div class="nav-actions">
+                <button class="btn-secondary" onclick="goBack()" title="Back to Recipes">← Back</button>
+                <div class="user-dropdown">
+                    <span class="user-avatar" id="user-avatar" onclick="toggleDropdown()">Un</span>
+                    <div class="dropdown-content" id="dropdown-menu">
+                        <a href="#" onclick="goToProfile()">👤 Profile</a>
+                        <a href="recipes.html">🍳 My Recipes</a>
+                        <a href="#" onclick="handleLogout()">🚪 Logout</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Loading State -->
+    <div id="loading-state" class="loading-container">
+        <div class="loading-spinner"></div>
+        <p>Loading recipe...</p>
+    </div>
+
+    <!-- Recipe Content -->
+    <main id="recipe-content" style="display: none;">
+        <div class="container">
+            <!-- Recipe Header - NO IMAGE -->
+            <div class="recipe-header">
+                <div class="recipe-info">
+                    <h1 id="recipe-title" class="recipe-title"></h1>
+                    <div class="recipe-meta">
+                        <span class="cook-time">
+                            <span class="time-icon">⏱️</span>
+                            <span id="cook-time">0</span> minutes
+                        </span>
+                        <span class="date-created">
+                            <span class="calendar-icon">📅</span>
+                            <span id="date-created">Today</span>
+                        </span>
+                    </div>
+                    <div class="recipe-actions">
+                        <button class="btn-danger" onclick="deleteRecipe()">🗑️ Delete</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="recipe-sections">
+                <!-- Ingredients Section -->
+                <div class="ingredients-section">
+                    <h2 class="section-title">🥘 Ingredients</h2>
+                    <ul id="ingredients-list" class="ingredients-list">
+                        <!-- Ingredients will be populated here -->
+                    </ul>
+                </div>
+
+                <!-- Instructions Section -->
+                <div class="instructions-section">
+                    <h2 class="section-title">👨‍🍳 Instructions</h2>
+                    <ol id="instructions-list" class="instructions-list">
+                        <!-- Instructions will be populated here -->
+                    </ol>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+    // Check authentication
+    if (!localStorage.getItem('accessToken')) {
+        window.location.href = 'login.html';
+    }
+
+    // Global variable to store current recipe ID
+    let currentRecipeId = null;
+
+    // UPDATED: Get user avatar on page load
+    async function updateUserAvatar() {
+        try {
+            const token = localStorage.getItem('accessToken');
+            if (!token) return;
+
+            const response = await fetch('/auth/users/me', {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (response.ok) {
+                const user = await response.json();
+                const initials = user.email.substring(0, 2).toUpperCase();
+                document.getElementById('user-avatar').textContent = initials;
+            }
+        } catch (error) {
+            console.error('Error fetching user info:', error);
+        }
+    }
+
+    // Get recipe ID from URL parameters
+    function getRecipeIdFromUrl() {
+        const urlParams = new URLSearchParams(window.location.search);
+        return urlParams.get('id');
+    }
+
+    // Load and display recipe
+    async function loadRecipe() {
+        const recipeId = getRecipeIdFromUrl();
+        
+        if (!recipeId) {
+            alert('No recipe ID provided');
+            window.location.href = 'recipes.html';
+            return;
+        }
+
+        try {
+            const token = localStorage.getItem('accessToken');
+            if (!token) {
+                window.location.href = 'login.html';
+                return;
+            }
+
+            const response = await fetch(`/recipes/${recipeId}`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+
+            if (response.status === 401) {
+                localStorage.removeItem('accessToken');
+                window.location.href = 'login.html';
+                return;
+            }
+
+            if (response.status === 404) {
+                alert('Recipe not found');
+                window.location.href = 'recipes.html';
+                return;
+            }
+
+            if (response.ok) {
+                const recipe = await response.json();
+                displayRecipe(recipe);
+            } else {
+                throw new Error('Failed to fetch recipe');
+            }
+        } catch (error) {
+            console.error('Error loading recipe:', error);
+            alert('Error loading recipe: ' + error.message);
+            window.location.href = 'recipes.html';
+        }
+    }
+
+    function displayRecipe(recipe) {
+        // Hide loading, show content
+        document.getElementById('loading-state').style.display = 'none';
+        document.getElementById('recipe-content').style.display = 'block';
+
+        // Update title
+        document.title = `RecipeVault - ${recipe.title}`;
+        
+        // Populate recipe data
+        document.getElementById('recipe-title').textContent = recipe.title;
+        
+        // NO IMAGE CODE - REMOVED ALL IMAGE HANDLING
+        
+        // Set cook time
+        document.getElementById('cook-time').textContent = recipe.cook_time_minutes || 0;
+
+        // FIXED: Populate ingredients
+        const ingredientsList = document.getElementById('ingredients-list');
+        ingredientsList.innerHTML = '';
+        
+        if (recipe.ingredients && recipe.ingredients.length > 0) {
+            recipe.ingredients.forEach(ingredient => {
+                const li = document.createElement('li');
+                li.className = 'ingredient-item';
+                li.innerHTML = `
+                    <span class="ingredient-name">${ingredient.name}</span>
+                    <span class="ingredient-amount">${ingredient.amount_text}</span>
+                `;
+                ingredientsList.appendChild(li);
+            });
+        } else {
+            ingredientsList.innerHTML = '<li class="no-ingredients">No ingredients listed</li>';
+        }
+
+        // FIXED: Handle instructions display (parse from description)
+        const instructionsList = document.getElementById('instructions-list');
+        instructionsList.innerHTML = '';
+        
+        if (recipe.description && recipe.description.trim()) {
+            // Split instructions by double line breaks (step separator)
+            const steps = recipe.description.split('\n\n').filter(step => step.trim());
+            
+            if (steps.length > 0) {
+                steps.forEach((step, index) => {
+                    const li = document.createElement('li');
+                    li.className = 'instruction-step';
+                    
+                    // Remove the number prefix if it exists (e.g., "1. Step text")
+                    const cleanStep = step.replace(/^\d+\.\s*/, '');
+                    
+                    li.innerHTML = `
+                        <div class="step-number">${index + 1}</div>
+                        <p class="step-text">${cleanStep}</p>
+                    `;
+                    instructionsList.appendChild(li);
+                });
+            } else {
+                instructionsList.innerHTML = `
+                    <li class="instruction-step">
+                        <div class="step-number">?</div>
+                        <p class="step-text">No instructions provided.</p>
+                    </li>
+                `;
+            }
+        } else {
+            instructionsList.innerHTML = `
+                <li class="instruction-step">
+                    <div class="step-number">?</div>
+                    <p class="step-text">No instructions provided.</p>
+                </li>
+            `;
+        }
+
+        // Store recipe ID for actions
+        currentRecipeId = recipe.id;
+    }
+
+    // NAVIGATION FUNCTIONS
+    function goBack() {
+        window.location.href = 'recipes.html';
+    }
+
+    // DROPDOWN FUNCTIONS - SAME AS RECIPES.HTML
+    function toggleDropdown() {
+        const dropdown = document.getElementById('dropdown-menu');
+        dropdown.classList.toggle('show');
+    }
+
+    function handleLogout() {
+        if (confirm('Are you sure you want to logout?')) {
+            localStorage.removeItem('accessToken');
+            window.location.href = 'login.html';
+        }
+    }
+
+    function goToProfile() {
+        alert('Profile page coming soon!');
+    }
+
+    function editRecipe() {
+        // TODO: Implement edit functionality
+        alert('Edit functionality coming soon!');
+    }
+
+    async function deleteRecipe() {
+        if (!currentRecipeId) return;
+
+        if (confirm('Are you sure you want to delete this recipe? This action cannot be undone.')) {
+            try {
+                const token = localStorage.getItem('accessToken');
+                const response = await fetch(`/recipes/${currentRecipeId}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                if (response.ok) {
+                    alert('Recipe deleted successfully!');
+                    window.location.href = 'recipes.html';
+                } else {
+                    throw new Error('Failed to delete recipe');
+                }
+            } catch (error) {
+                console.error('Error deleting recipe:', error);
+                alert('Error deleting recipe: ' + error.message);
+            }
+        }
+    }
+
+    // DROPDOWN CLICK OUTSIDE TO CLOSE
+    window.addEventListener('click', function(event) {
+        if (!event.target.matches('.user-avatar')) {
+            const dropdown = document.getElementById('dropdown-menu');
+            if (dropdown.classList.contains('show')) {
+                dropdown.classList.remove('show');
+            }
+        }
+    });
+
+    // Load recipe and user info when page loads
+    window.addEventListener('DOMContentLoaded', function() {
+        updateUserAvatar();
+        loadRecipe();
+    });
+    </script>
+</body>
+</html>

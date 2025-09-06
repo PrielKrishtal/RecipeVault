@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>About RecipeVault</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://fonts.googleapis.com/css2?family=Merriweather:wght@700&family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="about-page-body">
+    <nav>
+        <div class="container nav-container">
+            <a href="recipes.html" class="nav-title">🥄 RecipeVault</a>
+            <div class="nav-actions">
+                <a href="/static/recipes.html" class="user-avatar" id="user-avatar">P</a>
+                <a href="#" id="logout-button">Logout</a>
+            </div>
+        </div>
+    </nav>
+    <main>
+        <div class="about-card">
+            <h1>About RecipeVault</h1>
+            <h2>The Project</h2>
+            <p>
+                RecipeVault is a full-stack web application designed as a portfolio project to showcase modern backend development skills. The API is built with Python and FastAPI, featuring JWT authentication, full CRUD functionality for user-owned recipes, and a PostgreSQL database managed by Docker and Alembic for migrations.
+            </p>
+            <h2>The Developer</h2>
+            <p>
+                This project was developed by Priel Krishtal, a computer science student passionate about building robust and scalable backend systems.
+            </p>
+            <div class="about-links">
+                <a class="about-link" href="https://github.com/PrielKrishtal/fastapi-recipe-api" target="_blank" rel="noopener">View Project on GitHub</a>
+                <a class="about-link" href="https://www.linkedin.com/in/prielkrishtal/" target="_blank" rel="noopener">Connect on LinkedIn</a>
+            </div>
+        </div>
+    </main>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('logout-button').addEventListener('click', function(event) {
+                event.preventDefault();
+                localStorage.removeItem('accessToken');
+                window.location.href = 'login.html';
+            });
+        });
+    </script>
+</body>
+</html>
